@@ -231,14 +231,14 @@ open class BTNavigationDropdownMenu: UIView {
     fileprivate var menuArrow: UIImageView!
     fileprivate var backgroundView: UIView!
     fileprivate var tableView: BTTableView!
-    fileprivate var items: [AnyObject]!
+    fileprivate var items: [BTItem]!
     fileprivate var menuWrapper: UIView!
     
     required public init?(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
     
-    public init(navigationController: UINavigationController? = nil, containerView: UIView = UIApplication.shared.keyWindow!, title: String, items: [AnyObject]) {
+    public init(navigationController: UINavigationController? = nil, containerView: UIView = UIApplication.shared.keyWindow!, title: String, items: [BTItem]) {
         // Key window
         guard let window = UIApplication.shared.keyWindow else {
             super.init(frame: CGRect.zero)
@@ -307,7 +307,7 @@ open class BTNavigationDropdownMenu: UIView {
             }
             selfie.didSelectItemAtIndexHandler!(indexPath)
             if selfie.shouldChangeTitleText! {
-                selfie.setMenuTitle("\(selfie.tableView.items[indexPath])")
+                selfie.setMenuTitle("\(selfie.tableView.items[indexPath].title)")
             }
             self?.hideMenu()
             self?.layoutSubviews()
@@ -359,7 +359,7 @@ open class BTNavigationDropdownMenu: UIView {
         }
     }
     
-    open func updateItems(_ items: [AnyObject]) {
+    open func updateItems(_ items: [BTItem]) {
         if !items.isEmpty {
             self.tableView.items = items
             self.tableView.reloadData()
@@ -534,18 +534,18 @@ class BTTableView: UITableView, UITableViewDelegate, UITableViewDataSource {
     var selectRowAtIndexPathHandler: ((_ indexPath: Int) -> ())?
     
     // Private properties
-    fileprivate var items: [AnyObject]!
+    fileprivate var items: [BTItem]!
     fileprivate var selectedIndexPath: Int?
     
     required init?(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
     
-    init(frame: CGRect, items: [AnyObject], title: String, configuration: BTConfiguration) {
+    init(frame: CGRect, items: [BTItem], title: String, configuration: BTConfiguration) {
         super.init(frame: frame, style: UITableViewStyle.plain)
         
         self.items = items
-        self.selectedIndexPath = (items as! [String]).index(of: title)
+        self.selectedIndexPath = items.index() { $0.title == title }
         self.configuration = configuration
         
         // Setup table view
@@ -579,8 +579,10 @@ class BTTableView: UITableView, UITableViewDelegate, UITableViewDataSource {
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = BTTableViewCell(style: UITableViewCellStyle.default, reuseIdentifier: "Cell", configuration: self.configuration)
-        cell.textLabel?.text = self.items[(indexPath as NSIndexPath).row] as? String
+        let item = self.items[indexPath.row]
+        let cell = BTTableViewCell(style: UITableViewCellStyle.default, reuseIdentifier: "Cell", configuration: self.configuration, item: item)
+        cell.imageView?.image = item.image
+        cell.textLabel?.text = item.title
         cell.checkmarkIcon.isHidden = ((indexPath as NSIndexPath).row == selectedIndexPath) ? false : true
         return cell
     }
@@ -614,12 +616,13 @@ class BTTableView: UITableView, UITableViewDelegate, UITableViewDataSource {
 class BTTableViewCell: UITableViewCell {
     let checkmarkIconWidth: CGFloat = 50
     let horizontalMargin: CGFloat = 20
+    let imageMargin: CGFloat = 10
     
     var checkmarkIcon: UIImageView!
     var cellContentFrame: CGRect!
     var configuration: BTConfiguration!
     
-    init(style: UITableViewCellStyle, reuseIdentifier: String?, configuration: BTConfiguration) {
+    init(style: UITableViewCellStyle, reuseIdentifier: String?, configuration: BTConfiguration, item: BTItem) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
         
         self.configuration = configuration
@@ -628,13 +631,21 @@ class BTTableViewCell: UITableViewCell {
         cellContentFrame = CGRect(x: 0, y: 0, width: (UIApplication.shared.keyWindow?.frame.width)!, height: self.configuration.cellHeight)
         self.contentView.backgroundColor = self.configuration.cellBackgroundColor
         self.selectionStyle = UITableViewCellSelectionStyle.none
+        
+        self.imageView?.frame = CGRect(x: horizontalMargin, y: (cellContentFrame.height - 60)/2, width: 60, height: 60)
+        self.imageView?.contentMode = .scaleAspectFit
+        
         self.textLabel!.textColor = self.configuration.cellTextLabelColor
         self.textLabel!.font = self.configuration.cellTextLabelFont
         self.textLabel!.textAlignment = self.configuration.cellTextLabelAlignment
         if self.textLabel!.textAlignment == .center {
             self.textLabel!.frame = CGRect(x: 0, y: 0, width: cellContentFrame.width, height: cellContentFrame.height)
         } else if self.textLabel!.textAlignment == .left {
-            self.textLabel!.frame = CGRect(x: horizontalMargin, y: 0, width: cellContentFrame.width, height: cellContentFrame.height)
+            var x = horizontalMargin
+            if let _ = item.image, let width = imageView?.frame.size.width {
+                x = x + width + imageMargin
+            }
+            self.textLabel!.frame = CGRect(x: x, y: 0, width: cellContentFrame.width, height: cellContentFrame.height)
         } else {
             self.textLabel!.frame = CGRect(x: -horizontalMargin, y: 0, width: cellContentFrame.width, height: cellContentFrame.height)
         }
@@ -667,6 +678,16 @@ class BTTableViewCell: UITableViewCell {
     override func layoutSubviews() {
         self.bounds = cellContentFrame
         self.contentView.frame = self.bounds
+    }
+}
+
+public struct BTItem {
+    public let image: UIImage?
+    public let title: String
+    
+    public init(image: UIImage?, title: String) {
+        self.image = image
+        self.title = title
     }
 }
 
